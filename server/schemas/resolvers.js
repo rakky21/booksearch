@@ -108,36 +108,38 @@ const { AuthenticationError } = require('apollo-server-express');
 
 
 // import user model
-const { User } = require('../models');
+const { User, Book } = require('../models');
 // import sign token function from auth
 const { signToken } = require('../utils/auth');
 
 const resolvers = {
-  // get a single user by either their id or their username
-  Query: {
-    async getSingleUser(parent, args, { user }) {
-      const foundUser = await User.findOne({
-        _id: user._id,
-        // $or: [{ _id: user ? user._id : params.id }, { username: params.username }],
-      });
-
-      if (!foundUser) {
-        throw new AuthenticationError('You need to be logged in!');
-      }
-
-      return foundUser;
-    }
-  },
   // create a user, sign a token, and send it back (to client/src/components/SignUpForm.js)
-  Mutation: {
-    async createUser(parent, body, context) {
-      const user = await User.create(body);
-
-      if (!user) {
-        throw new AuthenticationError('You need to be logged in!');
+  Query: {
+    async me(parent, body, context) {
+      if (context.user) {
+        const userData = await User.findOne({ _id: context.user._id })
+          .select('-__v -password')
+        return userData;
       }
-      const token = signToken(user);
-      return { token, user };
+      throw new AuthenticationError('Not logged in');
+    },
+  },
+  Mutation: {
+    async addUser(parent, body, context) {
+      try {
+        console.log(body)
+        const user = await User.create(body);
+
+        if (!user) {
+          throw new AuthenticationError('You need to be logged in!');
+        }
+        const token = signToken(user);
+        console.log(token,user);
+        return { token, user };
+      } catch (err) {
+        console.log(err);
+        throw new AuthenticationError('Failed to add user');
+      }
     },
     // login a user, sign a token, and send it back (to client/src/components/LoginForm.js)
     // {body} is destructured req.body
@@ -159,7 +161,7 @@ const resolvers = {
     },
     // save a book to a user's `savedBooks` field by adding it to the set (to prevent duplicates)
     // user comes from `req.user` created in the auth middleware function
-    async saveBook(_, body, {user}) {
+    async saveBook(_, body, { user }) {
       console.log(user);
       try {
         const updatedUser = await User.findOneAndUpdate(
@@ -174,7 +176,7 @@ const resolvers = {
       }
     },
     // remove a book from `savedBooks`
-    async deleteBook(_, body, {user}) {
+    async removeBook(_, body, { user }) {
       const updatedUser = await User.findOneAndUpdate(
         { _id: user._id },
         { $pull: { savedBooks: { bookId: body.bookId } } },
