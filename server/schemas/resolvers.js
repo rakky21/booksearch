@@ -108,7 +108,7 @@ const { AuthenticationError } = require('apollo-server-express');
 
 
 // import user model
-const { User, Book } = require('../models');
+const { User } = require('../models');
 // import sign token function from auth
 const { signToken } = require('../utils/auth');
 
@@ -119,6 +119,7 @@ const resolvers = {
       if (context.user) {
         const userData = await User.findOne({ _id: context.user._id })
           .select('-__v -password')
+          .populate('books');
         return userData;
       }
       throw new AuthenticationError('Not logged in');
@@ -129,7 +130,6 @@ const resolvers = {
       try {
         console.log(body)
         const user = await User.create(body);
-
         if (!user) {
           throw new AuthenticationError('You need to be logged in!');
         }
@@ -149,9 +149,7 @@ const resolvers = {
       if (!user) {
         throw new AuthenticationError("Can't find user");
       }
-
       const correctPw = await user.isCorrectPassword(body.password);
-
       if (!correctPw) {
         throw new AuthenticationError('Wrong password');
 
